@@ -318,7 +318,24 @@ class Chatbot:
         ########################################################################
         #                          START OF YOUR CODE                          #
         ########################################################################                                                  
-        return 0 # TODO: delete and replace this line
+        no_space = re.compile("\w+")
+        tokens = re.findall(no_space, user_input)
+        counts = Counter()
+
+        for token in tokens:
+            token = token.lower()
+            if token in self.sentiment:
+                if self.sentiment[token] == 'pos':
+                    counts['pos'] += 1
+                else:
+                    counts['neg'] += 1
+
+        if counts['neg'] > counts['pos']:
+            return -1
+        elif counts['neg'] < counts['pos']:
+            return 1
+        
+        return 0 
         ########################################################################
         #                          END OF YOUR CODE                            #
         ########################################################################
