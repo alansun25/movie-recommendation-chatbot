@@ -15,8 +15,7 @@ class Chatbot:
     """Class that implements the chatbot for HW 6."""
 
     def __init__(self):
-        # The chatbot's default name is `moviebot`.
-        self.name = 'moviebot' # TODO: Give your chatbot a new name.
+        self.name = 'cupid'
 
         # This matrix has the following shape: num_movies x num_users
         # The values stored in each row i and column j is the rating for
@@ -42,40 +41,33 @@ class Chatbot:
         chatbot can do and how the user can interact with it.
         """
         return """
-        Your task is to implement the chatbot as detailed in the HW6
-        instructions (README.md).
-
-        To exit: write ":quit" (or press Ctrl-C to force the exit)
-
-        TODO: Write the description for your own chatbot here in the `intro()` function.
+        cupid is a chatbot that recommends movies it thinks you'll <3 love <3
+        
+        you can tell cupid about movies you've enjoyed and movies you've hated, 
+        and it will output new ones for you to watch based on these sentiments.
+        
+        cupid has access to multiple databases, including titles and ratings
+        from MovieLens and reviews from Rotten Tomatoes.
+        
+        have fun chatting and discovering new movies with cupid! <3
+        
+        (to exit: write ":quit" or press ctrl-c)
         """
 
     def greeting(self):
         """Return a message that the chatbot uses to greet the user."""
-        ########################################################################
-        # TODO: Write a short greeting message                                 #
-        ########################################################################
 
-        greeting_message = "How can I help you?"
-
-        ########################################################################
-        #                             END OF YOUR CODE                         #
-        ########################################################################
+        greeting_message = "hello! my name is cupid <3. i'll help you find a new movie to watch and love. tell me about a movie you've seen recently!"
+        
         return greeting_message
 
     def goodbye(self):
         """
         Return a message that the chatbot uses to bid farewell to the user.
         """
-        ########################################################################
-        # TODO: Write a short farewell message                                 #
-        ########################################################################
 
-        goodbye_message = "Have a nice day!"
+        goodbye_message = "thank you for chatting with me! i hope you love the new movies! <3 <3 <3"
 
-        ########################################################################
-        #                          END OF YOUR CODE                            #
-        ########################################################################
         return goodbye_message
 
     def debug(self, line):
@@ -112,19 +104,29 @@ class Chatbot:
         
         Returns: a string containing the chatbot's response to the user input
         """
-        ########################################################################
-        # TODO: Implement the extraction and transformation in this method,    #
-        # possibly calling other functions. Although your code is not graded   #
-        # directly based on how modular it is, we highly recommended writing   #
-        # code in a modular fashion to make it easier to improve and debug.    #
-        ########################################################################
-
-        response = "I (the chatbot) processed '{}'".format(line)
-
-        ########################################################################
-        #                          END OF YOUR CODE                            #
-        ########################################################################
-        return response
+        # TODO: Do I need to store the user input here now for sentiment analysis later?
+        
+        ###########################################################################################
+        # NOTE: Our progress is commented out below for now, until we have the completed submission.
+        ###########################################################################################
+        
+        # movie_indices = defaultdict(int)
+        # movies = self.extract_titles(line)
+        
+        # indices_list = []
+        # for movie in movies:
+        #     indices_list.append(self.find_movies_idx_by_title(movie))
+            # while len(idx) > 1:
+            #     clarification = input("")
+            #     idx = self.disambiguate_candidates()
+        
+        # movie_titles = []
+        # for indices in indices_list:
+        #     for i in indices:
+        #         movie_titles.append(self.titles[i])
+                
+        return "Got it."
+            
 
     def extract_titles(self, user_input: str) -> list:
         """Extract potential movie titles from the user input.
@@ -159,13 +161,14 @@ class Chatbot:
         Hints: 
             - What regular expressions would be helpful here? 
         """
-        ########################################################################
-        #                          START OF YOUR CODE                          #
-        ########################################################################                                             
-        return [] # TODO: delete and replace this line
-        ########################################################################
-        #                          END OF YOUR CODE                            #
-        ########################################################################
+        pattern = re.compile("\"[^\"]+\"")
+        titles = re.findall(pattern, user_input)
+        
+        # Remove leading and trailing whitespace
+        titles = [f"{title[1:-1].strip()}" for title in titles if title[1:-1].strip() != ""]
+        
+        return titles
+    
 
     def find_movies_idx_by_title(self, title:str) -> list:
         """ Given a movie title, return a list of indices of matching movies
@@ -200,13 +203,19 @@ class Chatbot:
             - Our solution only takes about 7 lines. If you're using much more than that try to think 
               of a more concise approach 
         """
-        ########################################################################
-        #                          START OF YOUR CODE                          #
-        ########################################################################                                                 
-        return [] # TODO: delete and replace this line
-        ########################################################################
-        #                          END OF YOUR CODE                            #
-        ########################################################################
+        indices = []
+        
+        no_punc = re.compile("\w+")
+        tokens = re.findall(no_punc, title)
+        
+        for i, entry in enumerate(self.titles):
+            for tok in tokens:
+                if tok.lower() not in entry[0].lower():
+                    break
+            else:
+                indices.append(i)
+                                                       
+        return indices
 
 
     def disambiguate_candidates(self, clarification:str, candidates:list) -> list: 
@@ -260,13 +269,19 @@ class Chatbot:
             - You might find one or more of the following helpful: 
               re.search, re.findall, re.match, re.escape, re.compile
         """
-        ########################################################################
-        #                          START OF YOUR CODE                          #
-        ########################################################################                                                 
-        return [] # TODO: delete and replace this line
-        ########################################################################
-        #                          END OF YOUR CODE                            #
-        ########################################################################
+        indices = []
+        
+        no_punc = re.compile("\w+")
+        tokens = re.findall(no_punc, clarification)
+        
+        for c in candidates:
+            title_tokens = re.findall(no_punc, self.titles[c][0])
+            for tok in tokens:
+                if tok.lower() in title_tokens:                    
+                    indices.append(c)
+                    break
+                                                       
+        return indices
 
     ############################################################################
     # 3. Sentiment                                                             #
