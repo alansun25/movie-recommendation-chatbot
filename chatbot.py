@@ -420,7 +420,7 @@ class Chatbot:
             - num_return (optional, int): The number of movies to recommend
 
         Example: 
-            bot_recommends = chatbot.recommend_movie({100: 1, 202: -1, 303: 1, 404:1, 505: 1})
+            bot_recommends = chatbot.recommend_movies({100: 1, 202: -1, 303: 1, 404:1, 505: 1})
             print(bot_recommends) // prints ['Trick or Treat (1986)', 'Dunston Checks In (1996)', 
             'Problem Child (1990)']
 
@@ -429,13 +429,14 @@ class Chatbot:
             - It may be helpful to play around with util.recommend() in scratch.ipynb
             to make sure you know what this function is doing. 
         """ 
-        ########################################################################
-        #                          START OF YOUR CODE                          #
-        ########################################################################                                                    
-        return [""]  # TODO: delete and replace this line
-        ########################################################################
-        #                          END OF YOUR CODE                            #
-        ########################################################################
+        assert len(user_ratings) > 4
+        
+        user_ratings_all = [user_ratings[i] if i in user_ratings else 0 for i in range(len(self.ratings))]
+        
+        # returns list of movie indices corresponding to movies in ratings_matrix
+        recs = util.recommend(user_ratings_all, self.ratings, num_return)
+        
+        return [self.titles[rec][0] for rec in recs]
 
 
     ############################################################################
