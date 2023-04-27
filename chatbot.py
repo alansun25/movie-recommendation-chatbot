@@ -17,18 +17,15 @@ class Chatbot:
     def __init__(self):
         self.name = 'cupid'
 
-        # This matrix has the following shape: num_movies x num_users
-        # The values stored in each row i and column j is the rating for
-        # movie i by user j
+        # shape: num_movies x num_users
+        # value at i, j is the rating for movie i by user j
         self.titles, self.ratings = util.load_ratings('data/ratings.txt')
-        
-        # Load sentiment words 
+
         self.sentiment = util.load_sentiment_dictionary('data/sentiment.txt')
+        
+        self.count_vectorizer = CountVectorizer() 
 
-        # Train the classifier
         self.train_logreg_sentiment_classifier()
-
-        # TODO: put any other class variables you need here 
 
     ############################################################################
     # 1. WARM UP REPL                                                          #
@@ -169,7 +166,6 @@ class Chatbot:
         
         return titles
     
-
     def find_movies_idx_by_title(self, title:str) -> list:
         """ Given a movie title, return a list of indices of matching movies
         The indices correspond to those in data/movies.txt.
@@ -216,7 +212,6 @@ class Chatbot:
                 indices.append(i)
                                                        
         return indices
-
 
     def disambiguate_candidates(self, clarification:str, candidates:list) -> list: 
         """Given a list of candidate movies that the user could be
@@ -270,17 +265,17 @@ class Chatbot:
               re.search, re.findall, re.match, re.escape, re.compile
         """
         indices = []
-        
+
         no_punc = re.compile("\w+")
         tokens = re.findall(no_punc, clarification)
-        
+
         for c in candidates:
-            title_tokens = re.findall(no_punc, self.titles[c][0])
+            title_tokens = [t.lower() for t in re.findall(no_punc, self.titles[c][0])]
             for tok in tokens:
                 if tok.lower() in title_tokens:                    
                     indices.append(c)
                     break
-                                                       
+
         return indices
 
     ############################################################################
@@ -315,8 +310,7 @@ class Chatbot:
             - Take a look at self.sentiment (e.g. in scratch.ipynb)
             - Remember we want the count of *tokens* not *types*
         """                                                
-        no_space = re.compile("\w+")
-        tokens = re.findall(no_space, user_input)
+        tokens = re.findall("\w+", user_input)
         counts = Counter()
 
         for token in tokens:
@@ -353,22 +347,15 @@ class Chatbot:
             - Our solution uses less than about 10 lines of code. Your solution might be a bit too complicated.
             - We achieve greater than accuracy 0.7 on the training dataset. 
         """ 
-        # load training data  
         texts, y = util.load_rotten_tomatoes_dataset()
-        
-        texts = [t.lower() for t in texts]
-        y[y == "Rotten"] = -1
-        y[y == "Fresh"] = 1
-         
-        # sklearn Logistic Regression classifier  
-        classifier = sklearn.linear_model.LogisticRegression(penalty=None)
-        
-        # CountVectorizer from sklearn 
-        self.count_vectorizer = CountVectorizer() 
+        texts = [text.lower() for text in texts]
+        y[y == "Rotten"], y[y == "Fresh"] = -1, 1
+        y = y.astype('int')
+
         texts_array = self.count_vectorizer.fit_transform(texts).toarray()
         
-        self.model = classifier.fit(texts_array, y)
-
+        self.model = sklearn.linear_model.LogisticRegression(penalty=None)
+        self.model.fit(texts_array, y)
 
     def predict_sentiment_statistical(self, user_input: str) -> int: 
         """ Uses a trained bag-of-words Logistic Regression classifier to classifier the sentiment
@@ -399,13 +386,14 @@ class Chatbot:
             - Be sure to lower-case the user input 
             - Don't forget about a case for the 0 class! 
         """
-        ########################################################################
-        #                          START OF YOUR CODE                          #
-        ########################################################################                                             
-        return 0 # TODO: delete and replace this line
-        ########################################################################
-        #                          END OF YOUR CODE                            #
-        ########################################################################
+        user_input = user_input.lower()
+        
+        input_array = self.count_vectorizer.transform([user_input]).toarray()
+        
+        if sum([abs(val) for val in input_array[0]]) == 0:
+            return 0
+        
+        return self.model.predict(input_array)[0]
 
 
     ############################################################################
