@@ -314,15 +314,26 @@ class Chatbot:
         Hints: 
             - Take a look at self.sentiment (e.g. in scratch.ipynb)
             - Remember we want the count of *tokens* not *types*
-        """
-        ########################################################################
-        #                          START OF YOUR CODE                          #
-        ########################################################################                                                  
-        return 0 # TODO: delete and replace this line
-        ########################################################################
-        #                          END OF YOUR CODE                            #
-        ########################################################################
+        """                                                
+        no_space = re.compile("\w+")
+        tokens = re.findall(no_space, user_input)
+        counts = Counter()
 
+        for token in tokens:
+            token = token.lower()
+            if token in self.sentiment:
+                if self.sentiment[token] == 'pos':
+                    counts['pos'] += 1
+                else:
+                    counts['neg'] += 1
+
+        if counts['neg'] > counts['pos']:
+            return -1
+        elif counts['neg'] < counts['pos']:
+            return 1
+        
+        return 0 
+    
     def train_logreg_sentiment_classifier(self):
         """
         Trains a bag-of-words Logistic Regression classifier on the Rotten Tomatoes dataset 
@@ -342,21 +353,21 @@ class Chatbot:
             - Our solution uses less than about 10 lines of code. Your solution might be a bit too complicated.
             - We achieve greater than accuracy 0.7 on the training dataset. 
         """ 
-        #load training data  
+        # load training data  
         texts, y = util.load_rotten_tomatoes_dataset()
-
-        self.model = None #variable name that will eventually be the sklearn Logistic Regression classifier you train 
-        self.count_vectorizer = None #variable name will eventually be the CountVectorizer from sklearn 
-
-        ########################################################################
-        #                          START OF YOUR CODE                          #
-        ########################################################################                                                
         
-        pass # TODO: delete and replace this line
-
-        ########################################################################
-        #                          END OF YOUR CODE                            #
-        ########################################################################
+        texts = [t.lower() for t in texts]
+        y[y == "Rotten"] = -1
+        y[y == "Fresh"] = 1
+         
+        # sklearn Logistic Regression classifier  
+        classifier = sklearn.linear_model.LogisticRegression(penalty=None)
+        
+        # CountVectorizer from sklearn 
+        self.count_vectorizer = CountVectorizer() 
+        texts_array = self.count_vectorizer.fit_transform(texts).toarray()
+        
+        self.model = classifier.fit(texts_array, y)
 
 
     def predict_sentiment_statistical(self, user_input: str) -> int: 
