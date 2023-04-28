@@ -48,13 +48,14 @@ class Chatbot:
         return """
         cupid is a chatbot that recommends movies it thinks you'll <3 love <3
         
-        you can tell cupid about movies you've enjoyed and movies you've hated, 
-        and it will output new ones for you to watch based on these sentiments.
+        you can tell cupid about movies you liked, movies you didn't like, or
+        somewhere in between, and it will output new ones for you to watch 
+        based on these sentiments.
         
         cupid has access to multiple databases, including titles and ratings
         from MovieLens and reviews from Rotten Tomatoes.
         
-        have fun chatting and discovering new movies with cupid! <3
+        have fun discovering new movies with cupid! <3
         
         (to exit: write ":quit" or press ctrl-c)
         """
@@ -62,7 +63,7 @@ class Chatbot:
     def greeting(self):
         """Return a message that the chatbot uses to greet the user."""
 
-        greeting_message = "hello! my name is cupid <3. i'll help you find new movies to watch and love if you tell me about movies you watched recently. but make sure to only tell me about one movie at a time and put its title in \"quotations\"!"
+        greeting_message = "hello! my name is cupid <3. i'll help you find new movies to love if you tell me about movies you've watched in the past. but make sure to only tell me about one movie at a time and put its title in \"quotations\"!"
         
         return greeting_message
 
@@ -111,7 +112,6 @@ class Chatbot:
         """
         if self.recs_given:
             self.user_ratings = {}
-            self.prompted_disambiguate = False
             self.recs_given = False
             self.recs = []
             self.current_rec_index = 0
@@ -172,13 +172,10 @@ class Chatbot:
         if self.giving_recs:
             line = re.sub(r'\W', '', line.lower())  
             self.current_rec_index += 1
-            if self.current_rec_index > 9:
-                self.giving_recs = False
-                self.recs_given = True
-                return self.process("")
             yes = ["yes", "yea", "yeah", "yah", "yuh", "y"]
             no = ["no", "nah", "nope", "naur", "nay", "n"]
-            if line in no:
+            
+            if line in no or self.current_rec_index > 9:
                 self.giving_recs = False
                 self.recs_given = True
                 return self.process("")
@@ -224,8 +221,7 @@ class Chatbot:
         pattern = re.compile("\"[^\"]+\"")
         titles = re.findall(pattern, user_input)
         
-        # Remove leading and trailing whitespace
-        # Only include non-empty strings between quotes
+        # Remove leading and trailing whitespace and only include non-empty strings between quotes
         titles = [f"{title[1:-1].strip()}" for title in titles if title[1:-1].strip() != ""]
         
         return titles
@@ -455,7 +451,7 @@ class Chatbot:
         
         input_array = self.count_vectorizer.transform([user_input]).toarray()
         
-        if sum([abs(val) for val in input_array[0]]) == 0:
+        if sum(input_array[0]) == 0:
             return 0
         
         return self.model.predict(input_array)[0]
@@ -537,6 +533,7 @@ class Chatbot:
         """The main functionality for this function is already in 
         'find_movies_idx_by_title' starting on line 199.
         
+        NOTE:
         This function is not explicitly included in process() because
         the code below is for testing purposes, i.e. demonstrating
         that 'find_movies_idx_by_title' indeed does return the correct 
