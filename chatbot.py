@@ -86,7 +86,7 @@ class Chatbot:
     ############################################################################
     # 2. Extracting and transforming                                           #
     ############################################################################
-    # TODO:
+
     def process(self, line: str) -> str:
         """Process a line of input from the REPL and generate a response.
 
