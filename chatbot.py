@@ -16,6 +16,14 @@ class Chatbot:
 
     def __init__(self):
         self.name = 'cupid'
+        self.user_ratings = {}
+        self.prompted_disambiguate = False
+        self.candidates = []
+        self.recs_given = False
+        self.current_sentiment = 0
+        self.giving_recs = False
+        self.recs = []
+        self.current_rec_index = 0
 
         # shape: num_movies x num_users
         # value at i, j is the rating for movie i by user j
@@ -23,7 +31,7 @@ class Chatbot:
 
         self.sentiment = util.load_sentiment_dictionary('data/sentiment.txt')
         
-        self.count_vectorizer = CountVectorizer() 
+        self.count_vectorizer = CountVectorizer(min_df=20, stop_words='english', max_features=1000) 
 
         self.train_logreg_sentiment_classifier()
 
@@ -54,7 +62,7 @@ class Chatbot:
     def greeting(self):
         """Return a message that the chatbot uses to greet the user."""
 
-        greeting_message = "hello! my name is cupid <3. i'll help you find a new movie to watch and love. tell me about a movie you've seen recently!"
+        greeting_message = "hello! my name is cupid <3. i'll help you find new movies to watch and love if you tell me about movies you watched recently. But make sure to only tell me about one movie at a time and put its title in \"quotations\"!"
         
         return greeting_message
 
@@ -78,7 +86,7 @@ class Chatbot:
     ############################################################################
     # 2. Extracting and transforming                                           #
     ############################################################################
-
+    # TODO:
     def process(self, line: str) -> str:
         """Process a line of input from the REPL and generate a response.
 
@@ -101,30 +109,85 @@ class Chatbot:
         
         Returns: a string containing the chatbot's response to the user input
         """
-        # TODO: Do I need to store the user input here now for sentiment analysis later?
-        
-        ###########################################################################################
-        # NOTE: Our progress is commented out below for now, until we have the completed submission.
-        ###########################################################################################
-        
-        # movie_indices = defaultdict(int)
-        # movies = self.extract_titles(line)
-        
-        # indices_list = []
-        # for movie in movies:
-        #     indices_list.append(self.find_movies_idx_by_title(movie))
-            # while len(idx) > 1:
-            #     clarification = input("")
-            #     idx = self.disambiguate_candidates()
-        
-        # movie_titles = []
-        # for indices in indices_list:
-        #     for i in indices:
-        #         movie_titles.append(self.titles[i])
+        if self.recs_given:
+            self.user_ratings = {}
+            self.prompted_disambiguate = False
+            self.recs_given = False
+            self.recs = []
+            self.current_rec_index = 0
+            return "feel free to ask for recommendations again by telling me about more movies you've seen! <3 (or enter :quit if you're done)"
+    
+        if len(self.user_ratings) < 5:
+            if self.prompted_disambiguate:
+                disam_candidates = self.disambiguate_candidates(line, self.candidates)
                 
-        return "Got it."
+                if len(disam_candidates) > 1:
+                    self.candidates = disam_candidates
+                    candidate_string = '\n'.join([self.titles[c][0] for c in self.candidates])
+                    return f"sorry, i still don't know which movie you're referring to:\n{candidate_string}"
+                elif len(disam_candidates) == 0:
+                    candidate_string = '\n'.join([self.titles[c][0] for c in self.candidates])
+                    return f"sorry, i still don't know which movie you're referring to:\n{candidate_string}"
+                
+                self.candidates = disam_candidates
+                self.prompted_disambiguate = False
+            else:
+                movie = self.extract_titles(line)
+                
+                if not movie:
+                    emotion_response = self.handle_emotions(line)
+                    
+                    if emotion_response:
+                        if emotion_response[0]:
+                            return f"glad to hear you're {emotion_response[1]} <3 hopefully my movie recommendations keep you feeling that way!"
+                        else:
+                            return f"sorry to hear you're {emotion_response[1]} :( i hope my movie recommendations can cheer you up <3"
+                        
+                    return "i don't understand! please try again <3"
+                
+                movie = movie[0]
+                self.current_sentiment = self.predict_sentiment_statistical(line)        
+                self.candidates = self.find_movies_idx_by_title(movie)
+                
+                if len(self.candidates) > 1:
+                    candidate_string = '\n'.join([self.titles[c][0] for c in self.candidates])
+                    self.prompted_disambiguate = True
+                    return f"which movie are you referring to:\n{candidate_string}"
+                elif len(self.candidates) == 0:
+                    return "sorry, i couldn't find that movie in my database :( please try again!"
             
+            self.user_ratings[self.candidates[0]] = self.current_sentiment
 
+            if len(self.user_ratings) < 5:
+                movie_name = self.titles[self.candidates[0]][0]
+                if self.current_sentiment == 1:
+                    return f"awesome, {movie_name} is great! tell me about another movie <3"
+                elif self.current_sentiment == 0:
+                    return f"so that's your opinion on {movie_name}... tell me about another movie <3"
+                else:
+                    return f"you're not a fan of {movie_name}, huh? tell me about another movie <3"
+        
+        self.recs = self.recommend_movies(self.user_ratings, 10) 
+           
+        if self.giving_recs:
+            line = re.sub(r'\W', '', line.lower())  
+            self.current_rec_index += 1
+            if self.current_rec_index > 9:
+                self.giving_recs = False
+                self.recs_given = True
+                return self.process("")
+            yes = ["yes", "yea", "yeah", "yah", "yuh", "y"]
+            no = ["no", "nah", "nope", "naur", "nay", "n"]
+            if line in no:
+                self.giving_recs = False
+                self.recs_given = True
+                return self.process("")
+            elif line in yes:
+                return f"lovely! i recommend {self.recs[self.current_rec_index]} <3 want another recommendation?"
+
+        self.giving_recs = True
+        return f"lovely! i recommend {self.recs[self.current_rec_index]} <3 want another recommendation?"
+            
     def extract_titles(self, user_input: str) -> list:
         """Extract potential movie titles from the user input.
 
@@ -162,12 +225,13 @@ class Chatbot:
         titles = re.findall(pattern, user_input)
         
         # Remove leading and trailing whitespace
+        # Only include non-empty strings between quotes
         titles = [f"{title[1:-1].strip()}" for title in titles if title[1:-1].strip() != ""]
         
         return titles
     
     def find_movies_idx_by_title(self, title:str) -> list:
-        """ Given a movie title, return a list of indices of matching movies
+        """Given a movie title, return a list of indices of matching movies
         The indices correspond to those in data/movies.txt.
 
         - If no movies are found that match the given title, return an empty
@@ -206,7 +270,7 @@ class Chatbot:
         
         for i, entry in enumerate(self.titles):
             for tok in tokens:
-                if tok.lower() not in entry[0].lower():
+                if not re.search(r'\b{}\b'.format(tok.lower()), entry[0].lower()):
                     break
             else:
                 indices.append(i)
@@ -272,9 +336,10 @@ class Chatbot:
         for c in candidates:
             title_tokens = [t.lower() for t in re.findall(no_punc, self.titles[c][0])]
             for tok in tokens:
-                if tok.lower() in title_tokens:                    
-                    indices.append(c)
+                if tok.lower() not in title_tokens:  
                     break
+            else:
+                indices.append(c)
 
         return indices
 
@@ -309,8 +374,8 @@ class Chatbot:
         Hints: 
             - Take a look at self.sentiment (e.g. in scratch.ipynb)
             - Remember we want the count of *tokens* not *types*
-        """                                                
-        tokens = re.findall("\w+", user_input)
+        """                                              
+        tokens = re.findall(r"\w+" , user_input)
         counts = Counter()
 
         for token in tokens:
@@ -429,8 +494,6 @@ class Chatbot:
             - It may be helpful to play around with util.recommend() in scratch.ipynb
             to make sure you know what this function is doing. 
         """ 
-        assert len(user_ratings) > 4
-        
         user_ratings_all = [user_ratings[i] if i in user_ratings else 0 for i in range(len(self.ratings))]
         
         # returns list of movie indices corresponding to movies in ratings_matrix
@@ -443,25 +506,106 @@ class Chatbot:
     # 5. Open-ended                                                            #
     ############################################################################
 
-    def function1():
-        """
-        TODO: delete and replace with your function.
-        Be sure to put an adequate description in this docstring.  
-        """
-        pass
+    def handle_emotions(self, user_input:str): 
+        """Identify and respond to user input expressing a particular
+        emotion.
+        
+        Arguments:     
+            - user_input (str) : a user-supplied line of text
 
-    def function2():
+        Returns: 
+            - (int, str) : a sentiment value for the specified emotion,
+                           and the word for the emotion expressed
+                - 1 is a positive sentiment
+                - 0 is a negative sentiment
+        
+        Note: This function uses the first emotion it finds in the user input.
         """
-        TODO: delete and replace with your function.
-        Be sure to put an adequate description in this docstring.  
-        """
-        pass  
+        positive = [word.strip() for word in open('data/emotions_positive.txt', 'r').read().split('\n')]
+        negative = [word.strip() for word in open('data/emotions_negative.txt', 'r').read().split('\n')]
+        
+        for word in user_input.split():
+            word = re.sub(r'\W', '', word.lower())
+            if word in positive:
+                return (1, word)
+            elif word in negative:
+                return (0, word)
+        
+        return None
 
-    def function3(): 
+    def handle_movie_titles_with_articles(self, user_input: str) -> list:
+        """The main functionality for this function is already in 
+        'find_movies_idx_by_title' starting on line 199.
+        
+        This function is not explicitly included in process() because
+        the code below is for testing purposes, i.e. demonstrating
+        that 'find_movies_idx_by_title' indeed does return the correct 
+        indices of movies that start with an article. However, 
+        'find_movies_idx_by_title' is used in process().
         """
-        Any additional functions beyond two count towards extra credit  
+        titles = self.extract_titles(user_input)
+        movie_indices = [idx for title in titles for idx in self.find_movies_idx_by_title(title)]
+        
+        return [self.titles[i][0] for i in movie_indices]
+    
+    def extract_titles_no_quote_wrong_cap(self, user_input: str) -> list:
+        """Extract a movie title from user input even if it is not contained
+        within quotation marks and has incorrect capitalization.
+        
+        - If there are no movie titles in the text, return an empty list.
+        - If there is exactly one movie title in the text, return a list
+        containing just that one movie title.
+        - If there are multiple movie titles in the text, return a list
+        of all movie titles you've extracted from the text.
+
+        Example 1:
+          potential_titles = chatbot.extract_titles_no_quote_wrong_cap("qwertyuiop")
+          print(potential_titles) // prints []
+
+        Example 2:
+          potential_titles = chatbot.extract_titles_no_quote_wrong_cap(
+                                            'I liked "The Notebook" a lot.')
+          print(potential_titles) // prints ["Notebook, The"]
+
+        Example 3: 
+          potential_titles = chatbot.extract_titles_no_quote_wrong_cap(
+                                            "I liked 10 things i HATE AbouT yOU")
+          print(potential_titles) // prints ["10 Things I Hate About You"] 
+          
+        Note: This function will always match the movie explicitly specified 
+        by the user input, and thus does extract the correct movie. However,
+        the implementation is sometimes more general, i.e. it will identify
+        movies that are not explicitly specified. This can later be handled
+        in disambiguate_candidates.
+        
+        Example:
+          potential_titles = chatbot.extract_titles_no_quote_wrong_cap(
+                                            "I liked The Hunger Games")    
+          print(potential_titles) // prints ["The Hunger Games", "Hunger", "The Hunger"]                 
+    
+        Arguments:     
+            - user_input (str) : a user-supplied line of text
+
+        Returns: 
+            - (list) movie titles that are potentially in the text
         """
-        pass 
+        titles = []
+        
+        # remove punctuation and articles from user input
+        user_input = " ".join(re.findall(r"\w+", user_input.lower())).lower()
+        user_input = re.sub(r"\b(a|an|the)\b", '', user_input).strip()
+        
+        for movie in self.titles:
+            original_title = movie[0][:-7] # remove release date from title
+            
+            # remove punctuation and articles from movie title
+            movie = " ".join(re.findall(r"\w+", original_title.lower()))        
+            movie = re.sub(r"\b(a|an|the)\b", '', movie).strip()
+            
+            if re.search(r'\b{}\b'.format(re.escape(movie)), user_input):
+                titles.append(original_title)
+        
+        return list(set(titles))
 
 
 if __name__ == '__main__':
