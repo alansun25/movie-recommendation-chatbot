@@ -62,7 +62,7 @@ class Chatbot:
     def greeting(self):
         """Return a message that the chatbot uses to greet the user."""
 
-        greeting_message = "hello! my name is cupid <3. i'll help you find new movies to watch and love if you tell me about movies you watched recently. But make sure to only tell me about one movie at a time and put its title in \"quotations\"!"
+        greeting_message = "hello! my name is cupid <3. i'll help you find new movies to watch and love if you tell me about movies you watched recently. but make sure to only tell me about one movie at a time and put its title in \"quotations\"!"
         
         return greeting_message
 
